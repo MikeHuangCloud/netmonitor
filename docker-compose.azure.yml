@@ -1,0 +1,24 @@
+version: '3.8'
+
+services:
+  netmonitor:
+    build: .
+    container_name: netmonitor-app
+    ports:
+      - "5000:5000"
+    environment:
+      - SECRET_KEY=your-secret-key-change-in-production
+      - DB_TYPE=mssql
+      - MSSQL_HOST=netmonitor-sqlserver.database.windows.net
+      - MSSQL_PORT=1433
+      - MSSQL_USER=netmonitoradmin
+      - MSSQL_PASSWORD=NetM0nitor@2026!
+      - MSSQL_DATABASE=netmonitordb
+      - PING_INTERVAL_SECONDS=60
+      - PING_COUNT=4
+      - PING_TIMEOUT=2
+      - DEFAULT_ADMIN_USERNAME=admin
+      - DEFAULT_ADMIN_PASSWORD=admin123
+    restart: unless-stopped
+
+# Azure SQL 在雲端，不需要本地 MySQL container

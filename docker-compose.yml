@@ -1,0 +1,54 @@
+version: '3.8'
+
+services:
+  netmonitor:
+    build: .
+    container_name: netmonitor-app
+    ports:
+      - "5000:5000"
+    environment:
+      - SECRET_KEY=your-secret-key-change-in-production
+      - MYSQL_HOST=mysql
+      - MYSQL_PORT=3306
+      - MYSQL_USER=netmonitor
+      - MYSQL_PASSWORD=netmonitor123
+      - MYSQL_DATABASE=netmonitor
+      - PING_INTERVAL_SECONDS=1
+      - PING_COUNT=1
+      - PING_TIMEOUT=2
+      - DEFAULT_ADMIN_USERNAME=admin
+      - DEFAULT_ADMIN_PASSWORD=admin123
+    depends_on:
+      mysql:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - netmonitor-network
+
+  mysql:
+    image: mysql:8.0
+    container_name: netmonitor-mysql
+    environment:
+      - MYSQL_ROOT_PASSWORD=rootpassword
+      - MYSQL_DATABASE=netmonitor
+      - MYSQL_USER=netmonitor
+      - MYSQL_PASSWORD=netmonitor123
+    ports:
+      - "3307:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-prootpassword"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - netmonitor-network
+
+networks:
+  netmonitor-network:
+    driver: bridge
+
+volumes:
+  mysql_data:

@@ -1,0 +1,26 @@
+{
+  "properties": {
+    "displayName": "netmonitor-wsl",
+    "description": "Network Monitor WSL Server",
+    "machineName": "netmonitor-wsl",
+    "megabytesOfMemory": 8192,
+    "numberOfCores": 4,
+    "operatingSystemType": "Linux",
+    "operatingSystemName": "Ubuntu",
+    "operatingSystemVersion": "24.04.4 LTS",
+    "bootType": "BIOS",
+    "disks": {
+      "disk-0": {
+        "displayName": "System Disk",
+        "gigabytesProvisioned": 128
+      }
+    },
+    "networkAdapters": {
+      "nic-0": {
+        "displayName": "eth0",
+        "ipAddresses": ["172.21.40.58"],
+        "macAddress": "00:15:5d:00:00:01"
+      }
+    }
+  }
+}

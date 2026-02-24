@@ -1,0 +1,347 @@
+{% extends "base.html" %}
+
+{% block title %}{{ target.name }} - Network Monitor{% endblock %}
+
+{% block content %}
+<nav aria-label="breadcrumb" class="mb-3">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{{ url_for('main.dashboard') }}">儀表板</a></li>
+        <li class="breadcrumb-item active">{{ target.name }}</li>
+    </ol>
+</nav>
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h2 class="mb-1">
+            <i class="bi bi-hdd-network me-2"></i>{{ target.name }}
+        </h2>
+        <p class="text-muted mb-0">
+            <i class="bi bi-geo-alt me-1"></i>{{ target.ip_address }}
+        </p>
+    </div>
+    <div>
+        <button class="btn btn-outline-primary btn-custom me-2" onclick="pingNow()">
+            <i class="bi bi-play-circle me-2"></i>立即 Ping
+        </button>
+        <a href="{{ url_for('main.targets') }}" class="btn btn-secondary btn-custom">
+            <i class="bi bi-arrow-left me-2"></i>返回
+        </a>
+    </div>
+</div>
+
+<!-- 即時狀態 -->
+<div class="row g-4 mb-4">
+    <div class="col-md-3">
+        <div class="stat-card">
+            <div class="d-flex align-items-center">
+                <div class="icon bg-primary bg-opacity-10 text-primary" id="status-icon">
+                    <i class="bi bi-question-circle"></i>
+                </div>
+                <div class="ms-3">
+                    <div class="value" id="current-status">-</div>
+                    <div class="label">目前狀態</div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="stat-card">
+            <div class="d-flex align-items-center">
+                <div class="icon bg-warning bg-opacity-10 text-warning">
+                    <i class="bi bi-clock"></i>
+                </div>
+                <div class="ms-3">
+                    <div class="value" id="current-delay">-</div>
+                    <div class="label">延遲 (ms)</div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="stat-card">
+            <div class="d-flex align-items-center">
+                <div class="icon bg-info bg-opacity-10 text-info">
+                    <i class="bi bi-arrow-repeat"></i>
+                </div>
+                <div class="ms-3">
+                    <div class="value" id="current-ttl">-</div>
+                    <div class="label">TTL</div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="stat-card">
+            <div class="d-flex align-items-center">
+                <div class="icon bg-success bg-opacity-10 text-success">
+                    <i class="bi bi-box"></i>
+                </div>
+                <div class="ms-3">
+                    <div class="value" id="current-bytes">-</div>
+                    <div class="label">Bytes</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 圖表區域 -->
+<div class="row g-4 mb-4">
+    <div class="col-md-8">
+        <div class="card card-custom">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span><i class="bi bi-graph-up me-2"></i>延遲歷史</span>
+                <select class="form-select form-select-sm w-auto" id="hours-select" onchange="loadHistory()">
+                    <option value="1">最近 1 小時</option>
+                    <option value="6">最近 6 小時</option>
+                    <option value="24" selected>最近 24 小時</option>
+                    <option value="72">最近 3 天</option>
+                    <option value="168">最近 7 天</option>
+                </select>
+            </div>
+            <div class="card-body">
+                <div class="chart-container">
+                    <canvas id="delayChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card card-custom h-100">
+            <div class="card-header">
+                <i class="bi bi-pie-chart me-2"></i>成功率統計
+            </div>
+            <div class="card-body">
+                <div class="chart-container">
+                    <canvas id="successChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 歷史記錄表格 -->
+<div class="card card-custom">
+    <div class="card-header">
+        <i class="bi bi-list-ul me-2"></i>最近記錄
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-sm table-hover align-middle">
+                <thead>
+                    <tr>
+                        <th>時間</th>
+                        <th>狀態</th>
+                        <th>延遲</th>
+                        <th>TTL</th>
+                        <th>Bytes</th>
+                        <th>錯誤訊息</th>
+                    </tr>
+                </thead>
+                <tbody id="records-table">
+                    <tr>
+                        <td colspan="6" class="text-center py-4 text-muted">載入中...</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const targetId = {{ target.id }};
+let delayChart, successChart;
+
+// 初始化延遲圖表
+function initDelayChart() {
+    const ctx = document.getElementById('delayChart').getContext('2d');
+    delayChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: [],
+            datasets: [{
+                label: '延遲 (ms)',
+                data: [],
+                borderColor: 'rgb(52, 152, 219)',
+                backgroundColor: 'rgba(52, 152, 219, 0.1)',
+                tension: 0.4,
+                fill: true
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    display: false
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    title: {
+                        display: true,
+                        text: '延遲 (ms)'
+                    }
+                }
+            }
+        }
+    });
+}
+
+// 初始化成功率圖表
+function initSuccessChart() {
+    const ctx = document.getElementById('successChart').getContext('2d');
+    successChart = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+            labels: ['成功', '失敗'],
+            datasets: [{
+                data: [0, 0],
+                backgroundColor: [
+                    'rgb(46, 204, 113)',
+                    'rgb(231, 76, 60)'
+                ]
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'bottom'
+                }
+            }
+        }
+    });
+}
+
+// 載入歷史數據
+async function loadHistory() {
+    const hours = document.getElementById('hours-select').value;
+    
+    try {
+        const response = await fetch(`/api/targets/${targetId}/history?hours=${hours}`);
+        const records = await response.json();
+        
+        // 更新延遲圖表
+        const labels = records.map(r => {
+            const date = new Date(r.created_at);
+            return date.toLocaleString('zh-TW', { 
+                month: 'numeric', 
+                day: 'numeric', 
+                hour: '2-digit', 
+                minute: '2-digit' 
+            });
+        });
+        const delays = records.map(r => r.delay_ms || 0);
+        
+        delayChart.data.labels = labels;
+        delayChart.data.datasets[0].data = delays;
+        delayChart.update();
+        
+        // 更新成功率圖表
+        const successCount = records.filter(r => r.is_success).length;
+        const failCount = records.length - successCount;
+        successChart.data.datasets[0].data = [successCount, failCount];
+        successChart.update();
+        
+        // 更新表格
+        updateTable(records.slice(-20).reverse());
+        
+        // 更新即時狀態（使用最新一筆）
+        if (records.length > 0) {
+            updateCurrentStatus(records[records.length - 1]);
+        }
+        
+    } catch (error) {
+        console.error('Failed to load history:', error);
+    }
+}
+
+// 更新即時狀態卡片
+function updateCurrentStatus(record) {
+    const statusIcon = document.getElementById('status-icon');
+    const statusText = document.getElementById('current-status');
+    
+    if (record.is_success) {
+        statusIcon.className = 'icon bg-success bg-opacity-10 text-success';
+        statusIcon.innerHTML = '<i class="bi bi-check-circle"></i>';
+        statusText.textContent = '在線';
+        statusText.style.color = 'var(--success-color)';
+    } else {
+        statusIcon.className = 'icon bg-danger bg-opacity-10 text-danger';
+        statusIcon.innerHTML = '<i class="bi bi-x-circle"></i>';
+        statusText.textContent = '離線';
+        statusText.style.color = 'var(--danger-color)';
+    }
+    
+    document.getElementById('current-delay').textContent = record.delay_ms || '-';
+    document.getElementById('current-ttl').textContent = record.ttl || '-';
+    document.getElementById('current-bytes').textContent = record.bytes || '-';
+}
+
+// 更新記錄表格
+function updateTable(records) {
+    const tbody = document.getElementById('records-table');
+    
+    if (records.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" class="text-center py-4 text-muted">尚無記錄</td></tr>';
+        return;
+    }
+    
+    tbody.innerHTML = records.map(r => `
+        <tr>
+            <td><small>${new Date(r.created_at).toLocaleString('zh-TW')}</small></td>
+            <td>
+                <span class="status-badge ${r.is_success ? 'status-online' : 'status-offline'}">
+                    ${r.is_success ? '成功' : '失敗'}
+                </span>
+            </td>
+            <td>${r.delay_ms || '-'}</td>
+            <td>${r.ttl || '-'}</td>
+            <td>${r.bytes || '-'}</td>
+            <td><small class="text-muted">${r.error_message || '-'}</small></td>
+        </tr>
+    `).join('');
+}
+
+// 立即 Ping
+async function pingNow() {
+    try {
+        const response = await fetch(`/api/targets/${targetId}/ping`, {
+            method: 'POST'
+        });
+        const data = await response.json();
+        
+        if (data.result) {
+            updateCurrentStatus({
+                is_success: data.result.is_success,
+                delay_ms: data.result.delay_ms,
+                ttl: data.result.ttl,
+                bytes: data.result.bytes,
+                error_message: data.result.error_message
+            });
+        }
+        
+        // 重新載入歷史
+        loadHistory();
+        
+    } catch (error) {
+        console.error('Ping failed:', error);
+    }
+}
+
+// 頁面載入時初始化
+document.addEventListener('DOMContentLoaded', function() {
+    initDelayChart();
+    initSuccessChart();
+    loadHistory();
+    
+    // 每 30 秒自動重新整理
+    setInterval(loadHistory, 30000);
+});
+</script>
+{% endblock %}
