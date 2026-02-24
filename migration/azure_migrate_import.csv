@@ -1,2 +1,0 @@
-Server name,IP addresses,Cores,Memory (MB),OS name,OS version,OS architecture,Boot type,Disks,Total disk size (GB),Network adapters,Total network throughput (Mbps),CPU utilization percentage,Memory utilization percentage,Storage read throughput (MB/s),Storage write throughput (MB/s),Storage read ops,Storage write ops
-netmonitor-wsl,172.21.40.58,4,8192,Ubuntu,24.04.4 LTS,x64,BIOS,1,128,1,1000,15,27,10,5,1000,500
